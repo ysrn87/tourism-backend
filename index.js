@@ -13,6 +13,9 @@ const agentRoutes = require('./routes/agent.routes');
 
 const app = express();
 
+// Trust proxy - REQUIRED for Railway/Render/Heroku deployment
+app.set('trust proxy', 1);
+
 /* CONFIGURATION */
 const PORT = process.env.PORT || 3000;
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3001';
@@ -49,7 +52,10 @@ app.use(express.urlencoded({ extended: true }));
 /* CORS */
 app.use(
   cors({
-    origin: FRONTEND_URL,
+    origin: [
+      FRONTEND_URL,
+      'meetandgo-backend.up.railway.app'
+    ],
     credentials: true
   })
 );

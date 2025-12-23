@@ -52,7 +52,7 @@ app.use(express.urlencoded({ extended: true }));
 /* CORS */
 app.use(
   cors({
-    origin: FRONTENDURL.includes(',') 
+    origin: FRONTEND_URL.includes(',') 
       ? FRONTEND_URL.split(',').map(url => url.trim())
       : FRONTEND_URL,
     credentials: true

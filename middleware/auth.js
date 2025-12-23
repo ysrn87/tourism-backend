@@ -55,7 +55,7 @@ function requireRole(...roles) {
       typeof req.session.user.role !== 'string'
     ) {
       console.warn(
-        `[SECURITY] Unauthorized access attempt from IP: ${req.ip} to ${req.originalUrl}`
+        `[SECURITY] Unauthorized role access attempt from IP: ${req.ip} to ${req.originalUrl}`
       );
       
       trackSuspiciousActivity(null, req.ip);
@@ -63,7 +63,7 @@ function requireRole(...roles) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    // Check if user's role matches any allowed role
+//     // Check if user's role matches any allowed role
     if (!roles.includes(req.session.user.role)) {
       console.warn(
         `[SECURITY] Role mismatch: ${req.session.user.role} (User ID: ${req.session.user.id}) ` +

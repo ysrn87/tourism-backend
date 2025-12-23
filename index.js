@@ -11,8 +11,6 @@ const userRoutes = require('./routes/user.routes');
 const adminRoutes = require('./routes/admin.routes');
 const agentRoutes = require('./routes/agent.routes');
 
-const FRONTENDURL = process.env.FRONTEND_URL || 'http://localhost:3001';
-
 const app = express();
 
 // Trust proxy - REQUIRED for Railway/Render/Heroku deployment
@@ -55,8 +53,8 @@ app.use(express.urlencoded({ extended: true }));
 app.use(
   cors({
     origin: FRONTENDURL.includes(',') 
-      ? FRONTENDURL.split(',').map(url => url.trim())
-      : FRONTENDURL,
+      ? FRONTEND_URL.split(',').map(url => url.trim())
+      : FRONTEND_URL,
     credentials: true
   })
 );

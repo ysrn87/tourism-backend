@@ -86,7 +86,13 @@ app.use((req, res, next) => {
   const origin = req.headers.origin;
   
   if (req.method !== 'GET') {
-    if (!origin || origin !== FRONTEND_URL) {
+    // Allow multiple frontend URLs (dev and production)
+    const allowedOrigins = FRONTEND_URL.includes(',') 
+      ? FRONTEND_URL.split(',').map(url => url.trim())
+      : [FRONTEND_URL];
+    
+    if (origin && !allowedOrigins.includes(origin)) {
+      console.warn(`[CSRF] Blocked request from origin: ${origin}`);
       return res.status(403).json({ error: 'CSRF blocked' });
     }
   }

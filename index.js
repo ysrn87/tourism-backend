@@ -54,7 +54,7 @@ app.use(
   cors({
     origin: [
       FRONTEND_URL,
-      'meetandgo-backend.up.railway.app'
+      'https://tourism-frontend-omega.vercel.app'
     ],
     credentials: true
   })

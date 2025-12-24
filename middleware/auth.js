@@ -6,7 +6,7 @@ function trackSuspiciousActivity(identifier, ip) {
   const attempts = suspiciousAttempts.get(key) || 0;
   suspiciousAttempts.set(key, attempts + 1);
   
-  if (attempts > 10) {
+  if (attempts +1 > 10) {
     console.error(`[SECURITY ALERT] High number of unauthorized attempts from ${key}`);
   }
   
@@ -63,7 +63,7 @@ function requireRole(...roles) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
-//     // Check if user's role matches any allowed role
+// Check if user's role matches any allowed role
     if (!roles.includes(req.session.user.role)) {
       console.warn(
         `[SECURITY] Role mismatch: ${req.session.user.role} (User ID: ${req.session.user.id}) ` +

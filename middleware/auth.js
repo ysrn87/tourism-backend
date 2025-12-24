@@ -48,6 +48,18 @@ function requireLogin(req, res, next) {
  */
 function requireRole(...roles) {
   return (req, res, next) => {
+
+    console.log('[DEBUG] requireRole:', {
+      url: req.originalUrl,
+      method: req.method,
+      hasSession: !!req.session,
+      sessionID: req.sessionID,
+      hasUser: !!req.session?.user,
+      userRole: req.session?.user?.role,
+      requiredRoles: roles,
+      cookies: req.headers.cookie ? 'present' : 'missing'
+    });
+
     // Ensure user is logged in
     if (
       !req.session ||
@@ -55,7 +67,7 @@ function requireRole(...roles) {
       typeof req.session.user.role !== 'string'
     ) {
       console.warn(
-        `[SECURITY] Unauthorized role access attempt from IP: ${req.ip} to ${req.originalUrl}`
+        `[SECURITY] Unauthorized warning access attempt from IP: ${req.ip} to ${req.originalUrl}`
       );
       
       trackSuspiciousActivity(null, req.ip);

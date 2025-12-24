@@ -155,27 +155,30 @@ router.post('/login', async (req, res) => {
             role: user.role
           };
 
-          // Update last login time
-          db.run(
-            `UPDATE users SET updated_at = datetime('now') WHERE id = ?`,
-            [user.id]
-          );
-
-          // Log login activity
-          logActivity(user.id, user.role, 'login', (logErr) => {
-            if (logErr) console.error('Activity log error:', logErr);
-          });
-
-          console.log(`[AUTH] Successful login: User ${user.id} (${user.role})`);
-
-          res.json({ 
-            success: true,
-            user: {
-              id: user.id,
-              name: user.name,
-              email: user.email,
-              role: user.role
+          // CRITICAL: Save session before sending response
+          req.session.save((saveErr) => {
+            if (saveErr) {
+              console.error('Session save error:', saveErr);
+              return res.status(500).json({ error: 'Login failed' });
             }
+
+            // Update last login time
+            db.run(
+              `UPDATE users SET updated_at = datetime('now') WHERE id = ?`,
+              [user.id]
+            );
+
+            console.log(`[AUTH] Successful login: User ${user.id} (${user.role})`);
+
+            res.json({ 
+              success: true,
+              user: {
+                id: user.id,
+                name: user.name,
+                email: user.email,
+                role: user.role
+              }
+            });
           });
         });
       }

@@ -65,7 +65,7 @@ router.post('/register', async (req, res) => {
     // Insert user
     db.run(
       `INSERT INTO users (name, email, phone, password, role, active, created_at, updated_at)
-       VALUES (?, ?, ?, ?, 'admin', 1, datetime('now'), datetime('now'))`,
+       VALUES (?, ?, ?, ?, 'user', 1, datetime('now'), datetime('now'))`,
       [name, email, phone, hash],
       function (err) {
         if (err) {

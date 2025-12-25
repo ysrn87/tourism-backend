@@ -1,7 +1,8 @@
 require('dotenv').config();
 const express = require('express');
 const session = require('express-session');
-const SQLiteStore = require('connect-sqlite3')(session);
+const pgSession = require('connect-pg-simple')(session);
+const { Pool } = require('pg');
 const cors = require('cors');
 const rateLimit = require('express-rate-limit');
 const helmet = require('helmet');
@@ -60,7 +61,13 @@ app.use(
 );
 
 /* SESSION */
-const path = require('path');
+/* SESSION */
+const sessionPool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: process.env.NODE_ENV === 'production' ? {
+    rejectUnauthorized: false
+  } : false
+});
 
 app.use(
   session({
@@ -68,14 +75,14 @@ app.use(
     secret: SESSION_SECRET,
     resave: false,
     saveUninitialized: false,
-    store: new SQLiteStore({
-      db: 'sessions.sqlite',
-      dir: path.join(__dirname, 'db')
+    store: new pgSession({
+      pool: sessionPool,
+      tableName: 'session'
     }),
     cookie: {
       httpOnly: true,
-      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax', // CHANGED
-      secure: process.env.NODE_ENV === 'production', // Must be true when sameSite: 'none'
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+      secure: process.env.NODE_ENV === 'production',
       maxAge: 1000 * 60 * 60 * 2 // 2 hours
     }
   })

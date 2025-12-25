@@ -3,26 +3,22 @@ const bcrypt = require('bcrypt');
 const db = require('../db/db');
 const router = express.Router();
 
-// Helper function to sanitize and validate input
-function validateRegistration(name, email, phone, password) {
+// Helper function to validate user input
+function validateUserInput(name, email, phone, password) {
   const errors = [];
 
-  // Name validation
   if (!name || name.trim().length < 2) {
     errors.push('Name must be at least 2 characters');
   }
 
-  // Email validation
   if (!email || !/^\S+@\S+\.\S+$/.test(email)) {
     errors.push('Invalid email format');
   }
 
-  // Phone validation
   if (!phone || !/^\d{9,15}$/.test(phone)) {
     errors.push('Phone number must be 9-15 digits');
   }
 
-  // Password validation
   if (!password || password.length < 8) {
     errors.push('Password must be at least 8 characters');
   }
@@ -31,13 +27,16 @@ function validateRegistration(name, email, phone, password) {
 }
 
 // Helper function to log activity
-function logActivity(userId, userRole, action, callback) {
-  db.run(
-    `INSERT INTO activity_logs (actor_id, actor_role, action, created_at)
-     VALUES (?, ?, ?, datetime('now'))`,
-    [userId, userRole, action],
-    callback
-  );
+async function logActivity(userId, userRole, action) {
+  try {
+    await db.query(
+      `INSERT INTO activity_logs (actor_id, actor_role, action, created_at)
+       VALUES ($1, $2, $3, CURRENT_TIMESTAMP)`,
+      [userId, userRole, action]
+    );
+  } catch (error) {
+    console.error('Activity log error:', error);
+  }
 }
 
 /**
@@ -51,10 +50,10 @@ router.post('/register', async (req, res) => {
     // Sanitize input
     name = name?.trim();
     email = email?.trim().toLowerCase();
-    phone = phone?.trim().replace(/\D/g, ''); // Remove non-digits
+    phone = phone?.trim().replace(/\D/g, '');
 
     // Validate input
-    const errors = validateRegistration(name, email, phone, password);
+    const errors = validateUserInput(name, email, phone, password);
     if (errors.length > 0) {
       return res.status(400).json({ error: errors[0] });
     }
@@ -63,40 +62,35 @@ router.post('/register', async (req, res) => {
     const hash = await bcrypt.hash(password, 10);
 
     // Insert user
-    db.run(
+    const result = await db.query(
       `INSERT INTO users (name, email, phone, password, role, active, created_at, updated_at)
-       VALUES (?, ?, ?, ?, 'user', 1, datetime('now'), datetime('now'))`,
-      [name, email, phone, hash],
-      function (err) {
-        if (err) {
-          console.error('Registration error:', err);
-          
-          // Specific error messages
-          if (err.message.includes('UNIQUE constraint failed: users.email')) {
-            return res.status(400).json({ error: 'Email already registered' });
-          }
-          if (err.message.includes('UNIQUE constraint failed: users.phone')) {
-            return res.status(400).json({ error: 'Phone number already registered' });
-          }
-          
-          return res.status(500).json({ error: 'Registration failed' });
-        }
-
-        const userId = this.lastID;
-
-        // Log registration activity
-        logActivity(userId, 'user', 'register', (logErr) => {
-          if (logErr) console.error('Activity log error:', logErr);
-        });
-
-        res.status(201).json({ 
-          success: true,
-          message: 'Registration successful'
-        });
-      }
+       VALUES ($1, $2, $3, $4, 'user', true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+       RETURNING id`,
+      [name, email, phone, hash]
     );
+
+    const userId = result.rows[0].id;
+
+    // Log registration activity
+    await logActivity(userId, 'user', 'register');
+
+    res.status(201).json({ 
+      success: true,
+      message: 'Registration successful'
+    });
   } catch (error) {
     console.error('Registration error:', error);
+    
+    // Handle unique constraint violations
+    if (error.code === '23505') {
+      if (error.constraint === 'users_email_key') {
+        return res.status(400).json({ error: 'Email already registered' });
+      }
+      if (error.constraint === 'users_phone_key') {
+        return res.status(400).json({ error: 'Phone number already registered' });
+      }
+    }
+    
     res.status(500).json({ error: 'Registration failed' });
   }
 });
@@ -118,71 +112,70 @@ router.post('/login', async (req, res) => {
     identifier = identifier.trim().toLowerCase();
 
     // Find user
-    db.get(
-      `SELECT * FROM users WHERE (email = ? OR phone = ?) AND active = 1`,
-      [identifier, identifier],
-      async (err, user) => {
-        if (err) {
-          console.error('Login database error:', err);
+    const result = await db.query(
+      `SELECT * FROM users WHERE (email = $1 OR phone = $1) AND active = true`,
+      [identifier]
+    );
+
+    const user = result.rows[0];
+
+    // Generic error message (don't reveal if user exists)
+    if (!user) {
+      console.warn(`[AUTH] Failed login attempt for: ${identifier} from IP: ${req.ip}`);
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
+
+    // Verify password
+    const passwordMatch = await bcrypt.compare(password, user.password);
+    if (!passwordMatch) {
+      console.warn(`[AUTH] Wrong password for user: ${user.id} from IP: ${req.ip}`);
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
+
+    // Regenerate session to prevent fixation
+    req.session.regenerate(async (regenerateErr) => {
+      if (regenerateErr) {
+        console.error('Session regeneration error:', regenerateErr);
+        return res.status(500).json({ error: 'Login failed' });
+      }
+
+      // Store user in session
+      req.session.user = {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role
+      };
+
+      // Save session
+      req.session.save(async (saveErr) => {
+        if (saveErr) {
+          console.error('Session save error:', saveErr);
           return res.status(500).json({ error: 'Login failed' });
         }
 
-        // Generic error message (don't reveal if user exists)
-        if (!user) {
-          console.warn(`[AUTH] Failed login attempt for: ${identifier} from IP: ${req.ip}`);
-          return res.status(401).json({ error: 'Invalid credentials' });
-        }
+        // Update last login time
+        await db.query(
+          `UPDATE users SET updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
+          [user.id]
+        );
 
-        // Verify password
-        const passwordMatch = await bcrypt.compare(password, user.password);
-        if (!passwordMatch) {
-          console.warn(`[AUTH] Wrong password for user: ${user.id} from IP: ${req.ip}`);
-          return res.status(401).json({ error: 'Invalid credentials' });
-        }
+        // Log login activity
+        await logActivity(user.id, user.role, 'login');
 
-        // Regenerate session to prevent fixation
-        req.session.regenerate((regenerateErr) => {
-          if (regenerateErr) {
-            console.error('Session regeneration error:', regenerateErr);
-            return res.status(500).json({ error: 'Login failed' });
-          }
+        console.log(`[AUTH] Successful login: User ${user.id} (${user.role})`);
 
-          // Store user in session
-          req.session.user = {
+        res.json({ 
+          success: true,
+          user: {
             id: user.id,
             name: user.name,
             email: user.email,
             role: user.role
-          };
-
-          // CRITICAL: Save session before sending response
-          req.session.save((saveErr) => {
-            if (saveErr) {
-              console.error('Session save error:', saveErr);
-              return res.status(500).json({ error: 'Login failed' });
-            }
-
-            // Update last login time
-            db.run(
-              `UPDATE users SET updated_at = datetime('now') WHERE id = ?`,
-              [user.id]
-            );
-
-            console.log(`[AUTH] Successful login: User ${user.id} (${user.role})`);
-
-            res.json({ 
-              success: true,
-              user: {
-                id: user.id,
-                name: user.name,
-                email: user.email,
-                role: user.role
-              }
-            });
-          });
+          }
         });
-      }
-    );
+      });
+    });
   } catch (error) {
     console.error('Login error:', error);
     res.status(500).json({ error: 'Login failed' });
@@ -193,7 +186,7 @@ router.post('/login', async (req, res) => {
  * POST /auth/logout
  * Logout and destroy session
  */
-router.post('/logout', (req, res) => {
+router.post('/logout', async (req, res) => {
   const userId = req.session?.user?.id;
   const userRole = req.session?.user?.role;
 
@@ -206,11 +199,9 @@ router.post('/logout', (req, res) => {
     // Clear session cookie
     res.clearCookie('meetandgo.sid');
 
-    // Log logout activity (if user was logged in)
+    // Log logout activity (fire and forget)
     if (userId && userRole) {
-      logActivity(userId, userRole, 'logout', (logErr) => {
-        if (logErr) console.error('Activity log error:', logErr);
-      });
+      logActivity(userId, userRole, 'logout').catch(console.error);
     }
 
     res.json({ 
@@ -245,7 +236,7 @@ router.get('/me', (req, res) => {
  */
 router.post('/refresh', (req, res) => {
   if (req.session?.user) {
-    req.session.touch(); // Extend session expiry
+    req.session.touch();
     res.json({ 
       success: true,
       message: 'Session refreshed'

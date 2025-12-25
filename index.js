@@ -21,6 +21,12 @@ app.set('trust proxy', 1);
 const PORT = process.env.PORT || 3000;
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3001';
 const SESSION_SECRET = process.env.SESSION_SECRET || 'dev-secret-change-in-production';
+const DATABASE_URL = process.env.DATABASE_URL;
+
+if (!DATABASE_URL) {
+  console.error('DATABASE_URL environment variable is required!');
+  process.exit(1);
+}
 
 /* SECURITY */
 app.use(helmet({
@@ -51,19 +57,20 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 /* CORS */
+const allowedOrigins = FRONTEND_URL.includes(',')
+  ? FRONTEND_URL.split(',').map(url => url.trim())
+  : [FRONTEND_URL];
+
 app.use(
   cors({
-    origin: FRONTEND_URL.includes(',') 
-      ? FRONTEND_URL.split(',').map(url => url.trim())
-      : FRONTEND_URL,
+    origin: allowedOrigins,
     credentials: true
   })
 );
 
 /* SESSION */
-/* SESSION */
 const sessionPool = new Pool({
-  connectionString: process.env.DATABASE_URL,
+  connectionString: DATABASE_URL,
   ssl: process.env.NODE_ENV === 'production' ? {
     rejectUnauthorized: false
   } : false
@@ -77,7 +84,8 @@ app.use(
     saveUninitialized: false,
     store: new pgSession({
       pool: sessionPool,
-      tableName: 'session'
+      tableName: 'session',
+      createTableIfMissing: true
     }),
     cookie: {
       httpOnly: true,
@@ -91,13 +99,8 @@ app.use(
 /* CSRF PROTECTION */
 app.use((req, res, next) => {
   const origin = req.headers.origin;
-  
+
   if (req.method !== 'GET') {
-    // Allow multiple frontend URLs (dev and production)
-    const allowedOrigins = FRONTEND_URL.includes(',') 
-      ? FRONTEND_URL.split(',').map(url => url.trim())
-      : [FRONTEND_URL];
-    
     if (origin && !allowedOrigins.includes(origin)) {
       console.warn(`[CSRF] Blocked request from origin: ${origin}`);
       return res.status(403).json({ error: 'CSRF blocked' });
@@ -108,10 +111,11 @@ app.use((req, res, next) => {
 
 /* HEALTH CHECK */
 app.get('/health', (req, res) => {
-  res.json({ 
-    status: 'ok', 
+  res.json({
+    status: 'ok',
     timestamp: new Date().toISOString(),
-    uptime: process.uptime()
+    uptime: process.uptime(),
+    database: 'postgresql'
   });
 });
 
@@ -129,10 +133,10 @@ app.use((req, res) => {
 /* ERROR HANDLER */
 app.use((err, req, res, next) => {
   console.error('Error:', err);
-  res.status(err.status || 500).json({ 
-    error: process.env.NODE_ENV === 'production' 
-      ? 'Internal server error' 
-      : err.message 
+  res.status(err.status || 500).json({
+    error: process.env.NODE_ENV === 'production'
+      ? 'Internal server error'
+      : err.message
   });
 });
 
@@ -141,6 +145,7 @@ const server = app.listen(PORT, () => {
   console.log(`Backend running at http://localhost:${PORT}`);
   console.log(`Frontend allowed from: ${FRONTEND_URL}`);
   console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`Database: PostgreSQL`);
 });
 
 /* GRACEFUL SHUTDOWN */
@@ -148,7 +153,10 @@ process.on('SIGTERM', () => {
   console.log('SIGTERM received, closing server gracefully');
   server.close(() => {
     console.log('Server closed');
-    process.exit(0);
+    sessionPool.end(() => {
+      console.log('Database pool closed');
+      process.exit(0);
+    });
   });
 });
 
@@ -156,6 +164,9 @@ process.on('SIGINT', () => {
   console.log('\nSIGINT received, closing server gracefully');
   server.close(() => {
     console.log('Server closed');
-    process.exit(0);
+    sessionPool.end(() => {
+      console.log('Database pool closed');
+      process.exit(0);
+    });
   });
 });

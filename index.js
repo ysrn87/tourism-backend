@@ -121,6 +121,102 @@ app.get('/health', (req, res) => {
   });
 });
 
+// TEMPORARY MIGRATION ENDPOINT - REMOVE AFTER USE
+app.post('/run-migration-rename-tour-guide-xyz123', async (req, res) => {
+  const { Pool } = require('pg');
+  
+  const pool = new Pool({
+    connectionString: DATABASE_URL,
+    ssl: process.env.NODE_ENV === 'production' ? {
+      rejectUnauthorized: false
+    } : false
+  });
+
+  const client = await pool.connect();
+  
+  try {
+    await client.query('BEGIN');
+
+    console.log('Starting migration: agent → tour_guide');
+
+    // 1. Update CHECK constraint on users table
+    await client.query(`
+      ALTER TABLE users 
+      DROP CONSTRAINT IF EXISTS users_role_check
+    `);
+
+    await client.query(`
+      ALTER TABLE users 
+      ADD CONSTRAINT users_role_check 
+      CHECK (role IN ('user', 'tour_guide', 'admin'))
+    `);
+
+    // 2. Update existing agent roles to tour_guide
+    const updateResult = await client.query(`
+      UPDATE users 
+      SET role = 'tour_guide' 
+      WHERE role = 'agent'
+    `);
+
+    console.log(`✅ Updated ${updateResult.rowCount} users from 'agent' to 'tour_guide'`);
+
+    // 3. Update activity_logs actor_role
+    const activityResult = await client.query(`
+      UPDATE activity_logs 
+      SET actor_role = 'tour_guide' 
+      WHERE actor_role = 'agent'
+    `);
+
+    console.log(`✅ Updated ${activityResult.rowCount} activity logs`);
+
+    // 4. Check if tour_guide_id column exists
+    const columnCheck = await client.query(`
+      SELECT column_name 
+      FROM information_schema.columns 
+      WHERE table_name = 'requests' AND column_name = 'tour_guide_id'
+    `);
+
+    if (columnCheck.rows.length === 0) {
+      // Column doesn't exist, rename it
+      await client.query(`
+        ALTER TABLE requests 
+        RENAME COLUMN agent_id TO tour_guide_id
+      `);
+      console.log('✅ Renamed agent_id to tour_guide_id in requests table');
+    } else {
+      console.log('✅ tour_guide_id column already exists');
+    }
+
+    // 5. Update indexes
+    await client.query('DROP INDEX IF EXISTS idx_requests_agent_id');
+    await client.query('CREATE INDEX IF NOT EXISTS idx_requests_tour_guide_id ON requests(tour_guide_id)');
+
+    console.log('✅ Updated indexes');
+
+    await client.query('COMMIT');
+    
+    res.json({
+      success: true,
+      message: 'Migration completed successfully',
+      details: {
+        usersUpdated: updateResult.rowCount,
+        activityLogsUpdated: activityResult.rowCount
+      }
+    });
+    
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('❌ Migration failed:', error);
+    res.status(500).json({
+      error: 'Migration failed',
+      details: error.message
+    });
+  } finally {
+    client.release();
+    pool.end();
+  }
+});
+
 /* ROUTES */
 app.use('/auth', authRoutes);
 app.use('/user', userRoutes);

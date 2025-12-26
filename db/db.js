@@ -136,7 +136,7 @@ const initializeTables = async () => {
     await client.query('CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)');
     await client.query('CREATE INDEX IF NOT EXISTS idx_users_role ON users(role)');
     await client.query('CREATE INDEX IF NOT EXISTS idx_requests_user_id ON requests(user_id)');
-    await client.query('CREATE INDEX IF NOT EXISTS idx_requests_tour_guide_id ON requests(tour_guide_id)');
+    //await client.query('CREATE INDEX IF NOT EXISTS idx_requests_tour_guide_id ON requests(tour_guide_id)');
     await client.query('CREATE INDEX IF NOT EXISTS idx_requests_status ON requests(status)');
     await client.query('CREATE INDEX IF NOT EXISTS idx_activity_logs_request_id ON activity_logs(request_id)');
     await client.query('CREATE INDEX IF NOT EXISTS idx_destinations_slug ON destinations(slug)');

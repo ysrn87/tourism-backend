@@ -108,7 +108,7 @@ router.get('/request/:requestId', requireLogin, async (req, res) => {
     const result = await db.query(
       `SELECT pp.* FROM payment_proofs pp
        INNER JOIN requests r ON pp.request_id = r.id
-       WHERE pp.request_id = $1 AND (r.user_id = $2 OR r.agent_id = $2)`,
+       WHERE pp.request_id = $1 AND (r.user_id = $2 OR r.tour_guide_id = $2)`,
       [requestId, userId]
     );
 

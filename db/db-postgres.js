@@ -34,7 +34,7 @@ const initializeTables = async () => {
         email VARCHAR(255) UNIQUE NOT NULL,
         phone VARCHAR(20) UNIQUE NOT NULL,
         password VARCHAR(255) NOT NULL,
-        role VARCHAR(20) NOT NULL CHECK(role IN ('user', 'agent', 'admin')),
+        role VARCHAR(20) NOT NULL CHECK(role IN ('user', 'tour_guide', 'admin')),
         active BOOLEAN DEFAULT TRUE,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -65,7 +65,7 @@ const initializeTables = async () => {
         destination VARCHAR(255) NOT NULL,
         message TEXT,
         status VARCHAR(20) DEFAULT 'pending' CHECK(status IN ('pending', 'assigned', 'in_progress', 'completed', 'cancelled')),
-        agent_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        tour_guide_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
@@ -90,7 +90,7 @@ const initializeTables = async () => {
     await pool.query('CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)');
     await pool.query('CREATE INDEX IF NOT EXISTS idx_users_role ON users(role)');
     await pool.query('CREATE INDEX IF NOT EXISTS idx_requests_user_id ON requests(user_id)');
-    await pool.query('CREATE INDEX IF NOT EXISTS idx_requests_agent_id ON requests(agent_id)');
+    await pool.query('CREATE INDEX IF NOT EXISTS idx_requests_tour_guide_id ON requests(tour_guide_id)');
     await pool.query('CREATE INDEX IF NOT EXISTS idx_requests_status ON requests(status)');
     await pool.query('CREATE INDEX IF NOT EXISTS idx_activity_logs_request_id ON activity_logs(request_id)');
     await pool.query('CREATE INDEX IF NOT EXISTS idx_destinations_slug ON destinations(slug)');

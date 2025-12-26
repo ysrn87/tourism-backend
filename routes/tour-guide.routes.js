@@ -10,16 +10,16 @@ const VALID_TRANSITIONS = {
   in_progress: ['completed']
 };
 
-// All allowed statuses for agents
+// All allowed statuses for tour guides
 const ALLOWED_STATUSES = ['assigned', 'in_progress', 'completed'];
 
 // Helper function to log activity
-async function logActivity(agentId, action, requestId, fromStatus, toStatus, note) {
+async function logActivity(tourGuideId, action, requestId, fromStatus, toStatus, note) {
   try {
     await db.query(
       `INSERT INTO activity_logs (actor_id, actor_role, action, request_id, from_status, to_status, note, created_at)
-       VALUES ($1, 'agent', $2, $3, $4, $5, $6, CURRENT_TIMESTAMP)`,
-      [agentId, action, requestId, fromStatus, toStatus, note]
+       VALUES ($1, 'tour_guide', $2, $3, $4, $5, $6, CURRENT_TIMESTAMP)`,
+      [tourGuideId, action, requestId, fromStatus, toStatus, note]
     );
   } catch (error) {
     console.error('Activity log error:', error);
@@ -27,14 +27,13 @@ async function logActivity(agentId, action, requestId, fromStatus, toStatus, not
 }
 
 /**
- * GET /agent/requests
- * Get all requests assigned to the agent
+ * GET /tour-guide/requests
+ * Get all requests assigned to the tour guide
  */
-router.get('/requests', requireRole('agent'), async (req, res) => {
-  const agentId = req.session.user.id;
+router.get('/requests', requireRole('tour_guide'), async (req, res) => {
+  const tourGuideId = req.session.user.id;
   
   try {
-    // Parse query parameters
     const page = Math.max(1, parseInt(req.query.page) || 1);
     const limit = Math.min(50, Math.max(1, parseInt(req.query.limit) || 10));
     const offset = (page - 1) * limit;
@@ -42,8 +41,8 @@ router.get('/requests', requireRole('agent'), async (req, res) => {
 
     // Get all requests for counts
     const allResult = await db.query(
-      'SELECT * FROM requests WHERE agent_id = $1',
-      [agentId]
+      'SELECT * FROM requests WHERE tour_guide_id = $1',
+      [tourGuideId]
     );
 
     // Build query for filtered results
@@ -61,12 +60,11 @@ router.get('/requests', requireRole('agent'), async (req, res) => {
         u.phone AS user_phone
       FROM requests r
       INNER JOIN users u ON r.user_id = u.id
-      WHERE r.agent_id = $1
+      WHERE r.tour_guide_id = $1
     `;
     
-    let params = [agentId];
+    let params = [tourGuideId];
 
-    // Filter by status if provided
     if (status && ALLOWED_STATUSES.includes(status)) {
       query += ' AND r.status = $2';
       params.push(status);
@@ -93,11 +91,11 @@ router.get('/requests', requireRole('agent'), async (req, res) => {
 });
 
 /**
- * GET /agent/requests/stats
- * Get request statistics for the agent
+ * GET /tour-guide/requests/stats
+ * Get request statistics for the tour guide
  */
-router.get('/requests/stats', requireRole('agent'), async (req, res) => {
-  const agentId = req.session.user.id;
+router.get('/requests/stats', requireRole('tour_guide'), async (req, res) => {
+  const tourGuideId = req.session.user.id;
 
   try {
     const result = await db.query(
@@ -107,8 +105,8 @@ router.get('/requests/stats', requireRole('agent'), async (req, res) => {
          COUNT(*) FILTER (WHERE status = 'in_progress') as in_progress,
          COUNT(*) FILTER (WHERE status = 'completed') as completed
        FROM requests
-       WHERE agent_id = $1`,
-      [agentId]
+       WHERE tour_guide_id = $1`,
+      [tourGuideId]
     );
 
     res.json(result.rows[0]);
@@ -119,11 +117,11 @@ router.get('/requests/stats', requireRole('agent'), async (req, res) => {
 });
 
 /**
- * GET /agent/requests/:id
+ * GET /tour-guide/requests/:id
  * Get details of a specific assigned request
  */
-router.get('/requests/:id', requireRole('agent'), async (req, res) => {
-  const agentId = req.session.user.id;
+router.get('/requests/:id', requireRole('tour_guide'), async (req, res) => {
+  const tourGuideId = req.session.user.id;
   const requestId = Number(req.params.id);
 
   if (!Number.isInteger(requestId)) {
@@ -145,8 +143,8 @@ router.get('/requests/:id', requireRole('agent'), async (req, res) => {
         u.phone AS user_phone
       FROM requests r
       INNER JOIN users u ON r.user_id = u.id
-      WHERE r.id = $1 AND r.agent_id = $2`,
-      [requestId, agentId]
+      WHERE r.id = $1 AND r.tour_guide_id = $2`,
+      [requestId, tourGuideId]
     );
 
     if (result.rows.length === 0) {
@@ -161,15 +159,14 @@ router.get('/requests/:id', requireRole('agent'), async (req, res) => {
 });
 
 /**
- * POST /agent/requests/:id/status
+ * POST /tour-guide/requests/:id/status
  * Update the status of an assigned request
  */
-router.post('/requests/:id/status', requireRole('agent'), async (req, res) => {
-  const agentId = req.session.user.id;
+router.post('/requests/:id/status', requireRole('tour_guide'), async (req, res) => {
+  const tourGuideId = req.session.user.id;
   const requestId = Number(req.params.id);
   let { status, note } = req.body;
 
-  // Validate input
   if (!Number.isInteger(requestId)) {
     return res.status(400).json({ error: 'Invalid request ID' });
   }
@@ -178,17 +175,14 @@ router.post('/requests/:id/status', requireRole('agent'), async (req, res) => {
     return res.status(400).json({ error: 'Status is required' });
   }
 
-  // Normalize status to lowercase
   status = status.toLowerCase();
 
-  // Validate status value
   if (!ALLOWED_STATUSES.includes(status)) {
     return res.status(400).json({ 
       error: `Invalid status. Allowed: ${ALLOWED_STATUSES.join(', ')}` 
     });
   }
 
-  // Sanitize note if provided
   if (note) {
     note = String(note).trim();
     if (note.length > 500) {
@@ -197,10 +191,9 @@ router.post('/requests/:id/status', requireRole('agent'), async (req, res) => {
   }
 
   try {
-    // Get current request
     const checkResult = await db.query(
-      `SELECT status FROM requests WHERE id = $1 AND agent_id = $2`,
-      [requestId, agentId]
+      `SELECT status FROM requests WHERE id = $1 AND tour_guide_id = $2`,
+      [requestId, tourGuideId]
     );
 
     if (checkResult.rows.length === 0) {
@@ -208,8 +201,6 @@ router.post('/requests/:id/status', requireRole('agent'), async (req, res) => {
     }
 
     const currentStatus = checkResult.rows[0].status;
-
-    // Check if transition is valid
     const allowedNext = VALID_TRANSITIONS[currentStatus] || [];
 
     if (!allowedNext.includes(status)) {
@@ -218,21 +209,19 @@ router.post('/requests/:id/status', requireRole('agent'), async (req, res) => {
       });
     }
 
-    // Update status
     const updateResult = await db.query(
       `UPDATE requests
        SET status = $1, updated_at = CURRENT_TIMESTAMP
-       WHERE id = $2 AND agent_id = $3`,
-      [status, requestId, agentId]
+       WHERE id = $2 AND tour_guide_id = $3`,
+      [status, requestId, tourGuideId]
     );
 
     if (updateResult.rowCount === 0) {
       return res.status(404).json({ error: 'Request not found' });
     }
 
-    // Log activity
     await logActivity(
-      agentId,
+      tourGuideId,
       'update_status',
       requestId,
       currentStatus,
@@ -253,11 +242,11 @@ router.post('/requests/:id/status', requireRole('agent'), async (req, res) => {
 });
 
 /**
- * GET /agent/requests/:id/activity
+ * GET /tour-guide/requests/:id/activity
  * Get activity log for a specific request
  */
-router.get('/requests/:id/activity', requireRole('agent'), async (req, res) => {
-  const agentId = req.session.user.id;
+router.get('/requests/:id/activity', requireRole('tour_guide'), async (req, res) => {
+  const tourGuideId = req.session.user.id;
   const requestId = Number(req.params.id);
 
   if (!Number.isInteger(requestId)) {
@@ -265,17 +254,15 @@ router.get('/requests/:id/activity', requireRole('agent'), async (req, res) => {
   }
 
   try {
-    // First verify the request belongs to this agent
     const checkResult = await db.query(
-      'SELECT id FROM requests WHERE id = $1 AND agent_id = $2',
-      [requestId, agentId]
+      'SELECT id FROM requests WHERE id = $1 AND tour_guide_id = $2',
+      [requestId, tourGuideId]
     );
 
     if (checkResult.rows.length === 0) {
       return res.status(404).json({ error: 'Request not found' });
     }
 
-    // Get activity logs
     const result = await db.query(
       `SELECT
         al.id,

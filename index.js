@@ -10,7 +10,9 @@ const helmet = require('helmet');
 const authRoutes = require('./routes/auth.routes');
 const userRoutes = require('./routes/user.routes');
 const adminRoutes = require('./routes/admin.routes');
-const agentRoutes = require('./routes/agent.routes');
+const tourGuideRoutes = require('./routes/tour-guide.routes');
+const packageRoutes = require('./routes/package.routes');
+const paymentRoutes = require('./routes/payment.routes');
 
 const app = express();
 
@@ -123,7 +125,14 @@ app.get('/health', (req, res) => {
 app.use('/auth', authRoutes);
 app.use('/user', userRoutes);
 app.use('/admin', adminRoutes);
-app.use('/agent', agentRoutes);
+app.use('/tour-guide', tourGuideRoutes);
+// Add after other route imports, before the routes section:
+app.use('/packages', packageRoutes);
+// Serve uploaded files statically
+app.use('/uploads', express.static('uploads'));
+// Add route
+app.use('/payment', paymentRoutes);
+
 
 /* 404 HANDLER */
 app.use((req, res) => {

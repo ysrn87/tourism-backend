@@ -104,12 +104,12 @@ router.get('/requests', requireLogin, async (req, res) => {
         r.destination,
         r.message,
         r.status,
-        r.agent_id,
+        r.tour_guide_id,
         r.created_at,
         r.updated_at,
-        u.name AS agent_name
+        u.name AS tour_guide_name
       FROM requests r
-      LEFT JOIN users u ON r.agent_id = u.id
+      LEFT JOIN users u ON r.tour_guide_id = u.id
       WHERE r.user_id = $1
     `;
     
@@ -188,14 +188,14 @@ router.get('/requests/:id', requireLogin, async (req, res) => {
         r.destination,
         r.message,
         r.status,
-        r.agent_id,
+        r.tour_guide_id,
         r.created_at,
         r.updated_at,
-        u.name AS agent_name,
-        u.email AS agent_email,
-        u.phone AS agent_phone
+        u.name AS tour_guide_name,
+        u.email AS tour_guide_email,
+        u.phone AS tour_guide_phone
       FROM requests r
-      LEFT JOIN users u ON r.agent_id = u.id
+      LEFT JOIN users u ON r.tour_guide_id = u.id
       WHERE r.id = $1 AND r.user_id = $2`,
       [requestId, userId]
     );

@@ -44,7 +44,7 @@ function requireLogin(req, res, next) {
  * Middleware to require specific role(s)
  * @param {...string} roles - One or more allowed roles
  * @example requireRole('admin')
- * @example requireRole('admin', 'agent')
+ * @example requireRole('admin', 'tour_guide')
  */
 function requireRole(...roles) {
   return (req, res, next) => {

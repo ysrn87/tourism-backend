@@ -32,7 +32,7 @@ pool.query('SELECT NOW()', (err, res) => {
 // Initialize tables
 const initializeTables = async () => {
   const client = await pool.connect();
-  
+
   try {
     await client.query('BEGIN');
 
@@ -44,7 +44,7 @@ const initializeTables = async () => {
         email VARCHAR(255) UNIQUE NOT NULL,
         phone VARCHAR(20) UNIQUE NOT NULL,
         password VARCHAR(255) NOT NULL,
-        role VARCHAR(20) NOT NULL CHECK(role IN ('user', 'agent', 'admin')),
+        role VARCHAR(20) NOT NULL CHECK(role IN ('user', 'tour_guide', 'admin')),
         active BOOLEAN DEFAULT TRUE,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -75,9 +75,45 @@ const initializeTables = async () => {
         destination VARCHAR(255) NOT NULL,
         message TEXT,
         status VARCHAR(20) DEFAULT 'pending' CHECK(status IN ('pending', 'assigned', 'in_progress', 'completed', 'cancelled')),
-        agent_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        tour_guide_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        package_id INTEGER REFERENCES packages(id) ON DELETE SET NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    
+    // PACKAGES TABLE
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS packages (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        destination VARCHAR(255) NOT NULL,
+        description TEXT,
+        price DECIMAL(10, 2) NOT NULL,
+        duration_days INTEGER NOT NULL,
+        max_seats INTEGER NOT NULL,
+        available_seats INTEGER NOT NULL,
+        image_url VARCHAR(500),
+        includes TEXT,
+        excludes TEXT,
+        itinerary TEXT,
+        active BOOLEAN DEFAULT TRUE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // PAYMENT PROOFS TABLE
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS payment_proofs (
+        id SERIAL PRIMARY KEY,
+        request_id INTEGER NOT NULL REFERENCES requests(id) ON DELETE CASCADE,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        file_name VARCHAR(255) NOT NULL,
+        file_path VARCHAR(500) NOT NULL,
+        file_size INTEGER,
+        mime_type VARCHAR(100),
+        uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
 
@@ -105,6 +141,13 @@ const initializeTables = async () => {
     await client.query('CREATE INDEX IF NOT EXISTS idx_activity_logs_request_id ON activity_logs(request_id)');
     await client.query('CREATE INDEX IF NOT EXISTS idx_destinations_slug ON destinations(slug)');
 
+    // Add indexes
+    await client.query('CREATE INDEX IF NOT EXISTS idx_packages_destination ON packages(destination)');
+    await client.query('CREATE INDEX IF NOT EXISTS idx_packages_active ON packages(active)');
+    await client.query('CREATE INDEX IF NOT EXISTS idx_payment_proofs_request_id ON payment_proofs(request_id)');
+    await client.query('CREATE INDEX IF NOT EXISTS idx_payment_proofs_user_id ON payment_proofs(user_id)');
+    await client.query('CREATE INDEX IF NOT EXISTS idx_requests_tour_guide_id ON requests(tour_guide_id)');
+    
     await client.query('COMMIT');
     console.log('✅ PostgreSQL tables initialized');
   } catch (error) {

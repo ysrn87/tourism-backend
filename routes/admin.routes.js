@@ -42,10 +42,10 @@ async function logActivity(adminId, action, requestId, note) {
 }
 
 /**
- * POST /admin/register/agent
- * Register a new agent
+ * POST /admin/register/tour-guide
+ * Register a new tour guide
  */
-router.post('/register/agent', requireRole('admin'), async (req, res) => {
+router.post('/register/tour-guide', requireRole('admin'), async (req, res) => {
   try {
     let { name, email, phone, password } = req.body;
 
@@ -63,31 +63,31 @@ router.post('/register/agent', requireRole('admin'), async (req, res) => {
     // Hash password
     const hash = await bcrypt.hash(password, 10);
 
-    // Insert agent
+    // Insert tour guide
     const result = await db.query(
       `INSERT INTO users (name, email, phone, password, role, active, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, 'agent', true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+       VALUES ($1, $2, $3, $4, 'tour_guide', true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
        RETURNING id`,
       [name, email, phone, hash]
     );
 
-    const agentId = result.rows[0].id;
+    const tourGuideId = result.rows[0].id;
 
     // Log activity
     await logActivity(
       req.session.user.id,
-      'register_agent',
+      'registertour_guide',
       null,
-      `Registered new agent: ${name} (ID: ${agentId})`
+      `Registered new tour guide: ${name} (ID: ${tourGuideId})`
     );
 
     res.status(201).json({
       success: true,
-      agentId: agentId,
-      message: 'Agent registered successfully'
+      tourGuideId: tourGuideId,
+      message: 'Tour Guide registered successfully'
     });
   } catch (error) {
-    console.error('Agent registration error:', error);
+    console.error('Tour Guide registration error:', error);
 
     if (error.code === '23505') {
       if (error.constraint === 'users_email_key') {
@@ -98,15 +98,15 @@ router.post('/register/agent', requireRole('admin'), async (req, res) => {
       }
     }
 
-    res.status(500).json({ error: 'Failed to register agent' });
+    res.status(500).json({ error: 'Failed to register tour guide' });
   }
 });
 
 /**
- * GET /admin/agents
- * Get all agents with their workload
+ * GET /admin/tour-guides
+ * Get all tour guides with their workload
  */
-router.get('/agents', requireRole('admin'), async (req, res) => {
+router.get('/tour-guides', requireRole('admin'), async (req, res) => {
   const page = Math.max(1, parseInt(req.query.page) || 1);
   const limit = Math.min(50, Math.max(1, parseInt(req.query.limit) || 20));
   const offset = (page - 1) * limit;
@@ -124,8 +124,8 @@ router.get('/agents', requireRole('admin'), async (req, res) => {
          COUNT(r.id) FILTER (WHERE r.status IN ('assigned', 'in_progress')) as active_requests,
          COUNT(r.id) FILTER (WHERE r.status = 'completed') as completed_requests
        FROM users u
-       LEFT JOIN requests r ON u.id = r.agent_id
-       WHERE u.role = 'agent'
+       LEFT JOIN requests r ON u.id = r.tour_guide_id
+       WHERE u.role = 'tour_guide'
        GROUP BY u.id
        ORDER BY u.created_at DESC
        LIMIT $1 OFFSET $2`,
@@ -134,11 +134,11 @@ router.get('/agents', requireRole('admin'), async (req, res) => {
 
     // Get total count
     const countResult = await db.query(
-      `SELECT COUNT(*) as total FROM users WHERE role = 'agent'`
+      `SELECT COUNT(*) as total FROM users WHERE role = 'tour_guide'`
     );
 
     res.json({
-      agents: result.rows,
+      tourGuides: result.rows,
       pagination: {
         page,
         limit,
@@ -147,35 +147,35 @@ router.get('/agents', requireRole('admin'), async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Failed to fetch agents:', error);
-    res.status(500).json({ error: 'Failed to fetch agents' });
+    console.error('Failed to fetch tour guides:', error);
+    res.status(500).json({ error: 'Failed to fetch tour guides' });
   }
 });
 
 /**
- * GET /admin/agents/:id
- * Get agent details with their requests
+ * GET /admin/tour-guides/:id
+ * Get tour guide details with their requests
  */
-router.get('/agents/:id', requireRole('admin'), async (req, res) => {
-  const agentId = Number(req.params.id);
+router.get('/tour-guides/:id', requireRole('admin'), async (req, res) => {
+  const tourGuideId = Number(req.params.id);
 
-  if (!Number.isInteger(agentId)) {
-    return res.status(400).json({ error: 'Invalid agent ID' });
+  if (!Number.isInteger(tourGuideId)) {
+    return res.status(400).json({ error: 'Invalid tour guide ID' });
   }
 
   try {
-    const agentResult = await db.query(
+    const tourGuideResult = await db.query(
       `SELECT id, name, email, phone, active, created_at
        FROM users
-       WHERE id = $1 AND role = 'agent'`,
-      [agentId]
+       WHERE id = $1 AND role = 'tour_guide'`,
+      [tourGuideId]
     );
 
-    if (agentResult.rows.length === 0) {
-      return res.status(404).json({ error: 'Agent not found' });
+    if (tourGuideResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Tour Guide not found' });
     }
 
-    // Get agent's requests
+    // Get tour guide's requests
     const requestsResult = await db.query(
       `SELECT
          r.id,
@@ -186,67 +186,67 @@ router.get('/agents/:id', requireRole('admin'), async (req, res) => {
          u.name AS user_name
        FROM requests r
        INNER JOIN users u ON r.user_id = u.id
-       WHERE r.agent_id = $1
+       WHERE r.tour_guide_id = $1
        ORDER BY r.created_at DESC
        LIMIT 50`,
-      [agentId]
+      [tourGuideId]
     );
 
     res.json({
-      agent: agentResult.rows[0],
+      tourGuide: tourGuideResult.rows[0],
       requests: requestsResult.rows
     });
   } catch (error) {
-    console.error('Failed to fetch agent details:', error);
-    res.status(500).json({ error: 'Failed to fetch agent details' });
+    console.error('Failed to fetch tour guide details:', error);
+    res.status(500).json({ error: 'Failed to fetch tour guide details' });
   }
 });
 
 /**
- * PATCH /admin/agents/:id/toggle-active
- * Activate or deactivate an agent
+ * PATCH /admin/tour-guides/:id/toggle-active
+ * Activate or deactivate an tour guide
  */
-router.patch('/agents/:id/toggle-active', requireRole('admin'), async (req, res) => {
-  const agentId = Number(req.params.id);
+router.patch('/tour-guides/:id/toggle-active', requireRole('admin'), async (req, res) => {
+  const tourGuideId = Number(req.params.id);
 
-  if (!Number.isInteger(agentId)) {
-    return res.status(400).json({ error: 'Invalid agent ID' });
+  if (!Number.isInteger(tourGuideId)) {
+    return res.status(400).json({ error: 'Invalid tour guide ID' });
   }
 
   try {
     const checkResult = await db.query(
       'SELECT id, name, active FROM users WHERE id = $1 AND role = $2',
-      [agentId, 'agent']
+      [tourGuideId, 'tour_guide']
     );
 
     if (checkResult.rows.length === 0) {
-      return res.status(404).json({ error: 'Agent not found' });
+      return res.status(404).json({ error: 'Tour Guide not found' });
     }
 
-    const agent = checkResult.rows[0];
-    const newActiveStatus = !agent.active;
+    const tourGuide = checkResult.rows[0];
+    const newActiveStatus = !tourGuide.active;
 
     await db.query(
       'UPDATE users SET active = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
-      [newActiveStatus, agentId]
+      [newActiveStatus, tourGuideId]
     );
 
     // Log activity
     await logActivity(
       req.session.user.id,
-      'toggle_agent_status',
+      'toggletour_guide_status',
       null,
-      `${newActiveStatus ? 'Activated' : 'Deactivated'} agent: ${agent.name}`
+      `${newActiveStatus ? 'Activated' : 'Deactivated'} tourGuide: ${tourGuide.name}`
     );
 
     res.json({
       success: true,
-      message: `Agent ${newActiveStatus ? 'activated' : 'deactivated'} successfully`,
+      message: `Tour Guide ${newActiveStatus ? 'activated' : 'deactivated'} successfully`,
       active: newActiveStatus
     });
   } catch (error) {
-    console.error('Failed to update agent:', error);
-    res.status(500).json({ error: 'Failed to update agent' });
+    console.error('Failed to update tour guide:', error);
+    res.status(500).json({ error: 'Failed to update tour guide' });
   }
 });
 
@@ -272,16 +272,16 @@ router.get('/requests', requireRole('admin'), async (req, res) => {
         r.destination,
         r.message,
         r.status,
-        r.agent_id,
+        r.tour_guide_id,
         r.created_at,
         r.updated_at,
         u.id AS user_id,
         u.name AS user_name,
         u.email AS user_email,
-        a.name AS agent_name
+        a.name AS tour_guide_name
       FROM requests r
       INNER JOIN users u ON r.user_id = u.id
-      LEFT JOIN users a ON r.agent_id = a.id
+      LEFT JOIN users a ON r.tour_guide_id = a.id
       WHERE 1=1
     `;
 
@@ -345,12 +345,12 @@ router.get('/requests/:id', requireRole('admin'), async (req, res) => {
         u.name AS user_name,
         u.email AS user_email,
         u.phone AS user_phone,
-        a.name AS agent_name,
-        a.email AS agent_email,
-        a.phone AS agent_phone
+        a.name AS tour_guide_name,
+        a.email AS tour_guide_email,
+        a.phone AS tour_guide_phone
       FROM requests r
       INNER JOIN users u ON r.user_id = u.id
-      LEFT JOIN users a ON r.agent_id = a.id
+      LEFT JOIN users a ON r.tour_guide_id = a.id
       WHERE r.id = $1`,
       [requestId]
     );
@@ -383,59 +383,59 @@ router.get('/requests/:id', requireRole('admin'), async (req, res) => {
 
 /**
  * POST /admin/requests/:id/assign
- * Assign a request to an agent
+ * Assign a request to an tour guide
  */
 router.post('/requests/:id/assign', requireRole('admin'), async (req, res) => {
   const adminId = req.session.user.id;
   const requestId = Number(req.params.id);
-  const { agentId } = req.body;
+  const { tourGuideId } = req.body;
 
   // Validate input
   if (!Number.isInteger(requestId)) {
     return res.status(400).json({ error: 'Invalid request ID' });
   }
 
-  if (!agentId || !Number.isInteger(Number(agentId))) {
-    return res.status(400).json({ error: 'Valid agent ID is required' });
+  if (!tourGuideId || !Number.isInteger(Number(tourGuideId))) {
+    return res.status(400).json({ error: 'Valid tour guide ID is required' });
   }
 
   try {
-    // Validate agent exists and is active
-    const agentResult = await db.query(
-      `SELECT id, name, active FROM users WHERE id = $1 AND role = 'agent'`,
-      [agentId]
+    // Validate tour guide exists and is active
+    const tourGuideResult = await db.query(
+      `SELECT id, name, active FROM users WHERE id = $1 AND role = 'tour_guide'`,
+      [tourGuideId]
     );
 
-    if (agentResult.rows.length === 0) {
-      return res.status(400).json({ error: 'Agent not found' });
+    if (tourGuideResult.rows.length === 0) {
+      return res.status(400).json({ error: 'Tour Guide not found' });
     }
 
-    const agent = agentResult.rows[0];
+    const tourGuide = tourGuideResult.rows[0];
 
-    if (!agent.active) {
-      return res.status(400).json({ error: 'Agent is not active' });
+    if (!tourGuide.active) {
+      return res.status(400).json({ error: 'Tour Guide is not active' });
     }
 
-    // Check agent workload
+    // Check tour guide workload
     const workloadResult = await db.query(
       `SELECT COUNT(*) as active_count
        FROM requests
-       WHERE agent_id = $1 AND status IN ('assigned', 'in_progress')`,
-      [agentId]
+       WHERE tour_guide_id = $1 AND status IN ('assigned', 'in_progress')`,
+      [tourGuideId]
     );
 
     if (parseInt(workloadResult.rows[0].active_count) >= 10) {
       return res.status(400).json({
-        error: 'Agent has too many active requests. Please choose another agent.'
+        error: 'Tour Guide has too many active requests. Please choose another tour guide.'
       });
     }
 
     // Assign request
     const updateResult = await db.query(
       `UPDATE requests
-       SET status = 'assigned', agent_id = $1, updated_at = CURRENT_TIMESTAMP
+       SET status = 'assigned', tour_guide_id = $1, updated_at = CURRENT_TIMESTAMP
        WHERE id = $2 AND status = 'pending'`,
-      [agentId, requestId]
+      [tourGuideId, requestId]
     );
 
     if (updateResult.rowCount === 0) {
@@ -459,12 +459,12 @@ router.post('/requests/:id/assign', requireRole('admin'), async (req, res) => {
       adminId,
       'assign_request',
       requestId,
-      `Assigned request to agent ${agent.name} (ID: ${agentId})`
+      `Assigned request to tour guide ${tourGuide.name} (ID: ${tourGuideId})`
     );
 
     res.json({
       success: true,
-      message: `Request assigned to ${agent.name} successfully`
+      message: `Request assigned to ${tourGuide.name} successfully`
     });
   } catch (error) {
     console.error('Failed to assign request:', error);
@@ -474,43 +474,43 @@ router.post('/requests/:id/assign', requireRole('admin'), async (req, res) => {
 
 /**
  * POST /admin/requests/:id/reassign
- * Reassign a request to a different agent
+ * Reassign a request to a different tour guide
  */
 router.post('/requests/:id/reassign', requireRole('admin'), async (req, res) => {
   const adminId = req.session.user.id;
   const requestId = Number(req.params.id);
-  const { agentId } = req.body;
+  const { tourGuideId } = req.body;
 
   if (!Number.isInteger(requestId)) {
     return res.status(400).json({ error: 'Invalid request ID' });
   }
 
-  if (!agentId || !Number.isInteger(Number(agentId))) {
-    return res.status(400).json({ error: 'Valid agent ID is required' });
+  if (!tourGuideId || !Number.isInteger(Number(tourGuideId))) {
+    return res.status(400).json({ error: 'Valid tour guide ID is required' });
   }
 
   try {
-    // Validate agent
-    const agentResult = await db.query(
-      `SELECT id, name, active FROM users WHERE id = $1 AND role = 'agent'`,
-      [agentId]
+    // Validate tour guide
+    const tourGuideResult = await db.query(
+      `SELECT id, name, active FROM users WHERE id = $1 AND role = 'tour_guide'`,
+      [tourGuideId]
     );
 
-    if (agentResult.rows.length === 0) {
-      return res.status(400).json({ error: 'Agent not found' });
+    if (tourGuideResult.rows.length === 0) {
+      return res.status(400).json({ error: 'Tour Guide not found' });
     }
 
-    const agent = agentResult.rows[0];
+    const tourGuide = tourGuideResult.rows[0];
 
-    if (!agent.active) {
-      return res.status(400).json({ error: 'Agent is not active' });
+    if (!tourGuide.active) {
+      return res.status(400).json({ error: 'Tour Guide is not active' });
     }
 
     // Get current request info
     const requestResult = await db.query(
-      `SELECT r.id, r.status, r.agent_id, a.name as old_agent_name
+      `SELECT r.id, r.status, r.tour_guide_id, a.name as oldtour_guide_name
        FROM requests r
-       LEFT JOIN users a ON r.agent_id = a.id
+       LEFT JOIN users a ON r.tour_guide_id = a.id
        WHERE r.id = $1`,
       [requestId]
     );
@@ -530,9 +530,9 @@ router.post('/requests/:id/reassign', requireRole('admin'), async (req, res) => 
     // Reassign
     await db.query(
       `UPDATE requests
-       SET agent_id = $1, updated_at = CURRENT_TIMESTAMP
+       SET tour_guide_id = $1, updated_at = CURRENT_TIMESTAMP
        WHERE id = $2`,
-      [agentId, requestId]
+      [tourGuideId, requestId]
     );
 
     // Log activity
@@ -540,12 +540,12 @@ router.post('/requests/:id/reassign', requireRole('admin'), async (req, res) => 
       adminId,
       'reassign_request',
       requestId,
-      `Reassigned from ${request.old_agent_name || 'unassigned'} to ${agent.name}`
+      `Reassigned from ${request.oldtour_guide_name || 'unassigned'} to ${tourGuide.name}`
     );
 
     res.json({
       success: true,
-      message: `Request reassigned to ${agent.name} successfully`
+      message: `Request reassigned to ${tourGuide.name} successfully`
     });
   } catch (error) {
     console.error('Failed to reassign request:', error);
@@ -568,8 +568,8 @@ router.get('/dashboard/stats', requireRole('admin'), async (req, res) => {
         (SELECT COUNT(*) FROM requests WHERE status = 'completed') as completed_requests,
         (SELECT COUNT(*) FROM requests WHERE status = 'cancelled') as cancelled_requests,
         (SELECT COUNT(*) FROM users WHERE role = 'user') as total_users,
-        (SELECT COUNT(*) FROM users WHERE role = 'agent') as total_agents,
-        (SELECT COUNT(*) FROM users WHERE role = 'agent' AND active = true) as active_agents
+        (SELECT COUNT(*) FROM users WHERE role = 'tour_guide') as total_tour_guides,
+        (SELECT COUNT(*) FROM users WHERE role = 'tour_guide' AND active = true) as active_tour_guides
     `);
 
     res.json(result.rows[0]);

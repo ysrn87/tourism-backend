@@ -67,21 +67,6 @@ const initializeTables = async () => {
       )
     `);
 
-    // REQUESTS TABLE
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS requests (
-        id SERIAL PRIMARY KEY,
-        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-        destination VARCHAR(255) NOT NULL,
-        message TEXT,
-        status VARCHAR(20) DEFAULT 'pending' CHECK(status IN ('pending', 'assigned', 'in_progress', 'completed', 'cancelled')),
-        tour_guide_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
-        package_id INTEGER REFERENCES packages(id) ON DELETE SET NULL,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
-    
     // PACKAGES TABLE
     await client.query(`
       CREATE TABLE IF NOT EXISTS packages (
@@ -117,6 +102,23 @@ const initializeTables = async () => {
       )
     `);
 
+
+    // REQUESTS TABLE
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS requests (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        destination VARCHAR(255) NOT NULL,
+        message TEXT,
+        status VARCHAR(20) DEFAULT 'pending' CHECK(status IN ('pending', 'assigned', 'in_progress', 'completed', 'cancelled')),
+        tour_guide_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        package_id INTEGER REFERENCES packages(id) ON DELETE SET NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    
+    
     // ACTIVITY LOGS TABLE
     await client.query(`
       CREATE TABLE IF NOT EXISTS activity_logs (

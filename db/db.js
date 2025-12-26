@@ -88,21 +88,6 @@ const initializeTables = async () => {
       )
     `);
 
-    // PAYMENT PROOFS TABLE
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS payment_proofs (
-        id SERIAL PRIMARY KEY,
-        request_id INTEGER NOT NULL REFERENCES requests(id) ON DELETE CASCADE,
-        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-        file_name VARCHAR(255) NOT NULL,
-        file_path VARCHAR(500) NOT NULL,
-        file_size INTEGER,
-        mime_type VARCHAR(100),
-        uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
-
-
     // REQUESTS TABLE
     await client.query(`
       CREATE TABLE IF NOT EXISTS requests (
@@ -117,7 +102,20 @@ const initializeTables = async () => {
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
-    
+
+    // PAYMENT PROOFS TABLE
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS payment_proofs (
+        id SERIAL PRIMARY KEY,
+        request_id INTEGER NOT NULL REFERENCES requests(id) ON DELETE CASCADE,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        file_name VARCHAR(255) NOT NULL,
+        file_path VARCHAR(500) NOT NULL,
+        file_size INTEGER,
+        mime_type VARCHAR(100),
+        uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
     
     // ACTIVITY LOGS TABLE
     await client.query(`

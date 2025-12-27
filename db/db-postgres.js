@@ -83,7 +83,7 @@ const initializeTables = async () => {
       ) 
     `);
 
-// TOUR BOOKINGS TABLE (for future use)
+    // TOUR BOOKINGS TABLE (for future use)
     await pool.query(`
       CREATE TABLE IF NOT EXISTS tour_bookings (
         id SERIAL PRIMARY KEY,

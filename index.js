@@ -7,11 +7,11 @@ const cors = require('cors');
 const rateLimit = require('express-rate-limit');
 const helmet = require('helmet');
 
+const packageRoutes = require('./routes/package.routes');
 const authRoutes = require('./routes/auth.routes');
 const userRoutes = require('./routes/user.routes');
 const adminRoutes = require('./routes/admin.routes');
 const tourGuideRoutes = require('./routes/tour-guide.routes');
-const packageRoutes = require('./routes/package.routes');
 const paymentRoutes = require('./routes/payment.routes');
 
 const app = express();

@@ -57,6 +57,48 @@ const initializeTables = async () => {
       )
     `);
 
+    // TOUR PACKAGES TABLE
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS tour_packages (
+        id SERIAL PRIMARY KEY,
+        title VARCHAR(255) NOT NULL,
+        slug VARCHAR(255) NOT NULL UNIQUE,
+        destination VARCHAR(255) NOT NULL,
+        description TEXT,
+        image_url VARCHAR(500),
+        price DECIMAL(10, 2) NOT NULL,
+        duration_days INTEGER NOT NULL,
+        duration_nights INTEGER NOT NULL,
+        departure_days VARCHAR(100), -- e.g., "Monday, Wednesday, Friday"
+        seats_available INTEGER NOT NULL,
+        seats_total INTEGER NOT NULL,
+        itinerary JSONB, -- Store as JSON array
+        includes JSONB, -- Array of included items
+        excludes JSONB, -- Array of excluded items
+        highlights JSONB, -- Key highlights
+        featured BOOLEAN DEFAULT FALSE,
+        active BOOLEAN DEFAULT TRUE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      ) 
+    `);
+
+// TOUR BOOKINGS TABLE (for future use)
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS tour_bookings (
+        id SERIAL PRIMARY KEY,
+        package_id INTEGER NOT NULL REFERENCES tour_packages(id) ON DELETE CASCADE,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        departure_date DATE NOT NULL,
+        num_travelers INTEGER NOT NULL,
+        total_price DECIMAL(10, 2) NOT NULL,
+        status VARCHAR(20) DEFAULT 'pending' CHECK(status IN ('pending', 'confirmed', 'cancelled', 'completed')),
+        notes TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
     // REQUESTS TABLE
     await pool.query(`
       CREATE TABLE IF NOT EXISTS requests (
@@ -94,6 +136,15 @@ const initializeTables = async () => {
     await pool.query('CREATE INDEX IF NOT EXISTS idx_requests_status ON requests(status)');
     await pool.query('CREATE INDEX IF NOT EXISTS idx_activity_logs_request_id ON activity_logs(request_id)');
     await pool.query('CREATE INDEX IF NOT EXISTS idx_destinations_slug ON destinations(slug)');
+    await pool.query('CREATE INDEX IF NOT EXISTS idx_tour_packages_destination ON tour_packages(destination)');
+    await pool.query('CREATE INDEX IF NOT EXISTS idx_tour_packages_available ON tour_packages(available)');
+
+    // Create indexes
+    await pool.query('CREATE INDEX IF NOT EXISTS idx_tour_packages_slug ON tour_packages(slug)');
+    await pool.query('CREATE INDEX IF NOT EXISTS idx_tour_packages_destination ON tour_packages(destination)');
+    await pool.query('CREATE INDEX IF NOT EXISTS idx_tour_packages_active ON tour_packages(active)');
+    await pool.query('CREATE INDEX IF NOT EXISTS idx_tour_bookings_package_id ON tour_bookings(package_id)');
+    await pool.query('CREATE INDEX IF NOT EXISTS idx_tour_bookings_user_id ON tour_bookings(user_id)');
 
     console.log('✅ PostgreSQL tables initialized');
   } catch (error) {

@@ -126,11 +126,8 @@ app.use('/auth', authRoutes);
 app.use('/user', userRoutes);
 app.use('/admin', adminRoutes);
 app.use('/tour-guide', tourGuideRoutes);
-// Add after other route imports, before the routes section:
 app.use('/packages', packageRoutes);
-// Serve uploaded files statically
 app.use('/uploads', express.static('uploads'));
-// Add route
 app.use('/payment', paymentRoutes);
 
 

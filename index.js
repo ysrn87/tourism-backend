@@ -12,6 +12,7 @@ const authRoutes = require('./routes/auth.routes');
 const userRoutes = require('./routes/user.routes');
 const adminRoutes = require('./routes/admin.routes');
 const tourGuideRoutes = require('./routes/tour-guide.routes');
+const bookingRoutes = require('./routes/booking.routes');
 const paymentRoutes = require('./routes/payment.routes');
 
 const app = express();
@@ -127,6 +128,7 @@ app.use('/user', userRoutes);
 app.use('/admin', adminRoutes);
 app.use('/tour-guide', tourGuideRoutes);
 app.use('/packages', packageRoutes);
+app.use('/bookings', bookingRoutes);
 app.use('/uploads', express.static('uploads'));
 app.use('/payment', paymentRoutes);
 

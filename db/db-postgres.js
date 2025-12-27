@@ -83,7 +83,7 @@ const initializeTables = async () => {
       ) 
     `);
 
-    // TOUR BOOKINGS TABLE (for future use)
+    // TOUR BOOKINGS TABLE
     await pool.query(`
       CREATE TABLE IF NOT EXISTS tour_bookings (
         id SERIAL PRIMARY KEY,
@@ -145,6 +145,12 @@ const initializeTables = async () => {
     await pool.query('CREATE INDEX IF NOT EXISTS idx_tour_packages_active ON tour_packages(active)');
     await pool.query('CREATE INDEX IF NOT EXISTS idx_tour_bookings_package_id ON tour_bookings(package_id)');
     await pool.query('CREATE INDEX IF NOT EXISTS idx_tour_bookings_user_id ON tour_bookings(user_id)');
+
+    // Create indexes
+    await pool.query('CREATE INDEX IF NOT EXISTS idx_tour_bookings_package_id ON tour_bookings(package_id)');
+    await pool.query('CREATE INDEX IF NOT EXISTS idx_tour_bookings_user_id ON tour_bookings(user_id)');
+    await pool.query('CREATE INDEX IF NOT EXISTS idx_tour_bookings_status ON tour_bookings(status)');
+    await pool.query('CREATE INDEX IF NOT EXISTS idx_tour_bookings_departure_date ON tour_bookings(departure_date)');
 
     console.log('✅ PostgreSQL tables initialized');
   } catch (error) {

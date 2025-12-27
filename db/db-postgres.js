@@ -137,7 +137,7 @@ const initializeTables = async () => {
     await pool.query('CREATE INDEX IF NOT EXISTS idx_activity_logs_request_id ON activity_logs(request_id)');
     await pool.query('CREATE INDEX IF NOT EXISTS idx_destinations_slug ON destinations(slug)');
     await pool.query('CREATE INDEX IF NOT EXISTS idx_tour_packages_destination ON tour_packages(destination)');
-    await pool.query('CREATE INDEX IF NOT EXISTS idx_tour_packages_available ON tour_packages(available)');
+    //await pool.query('CREATE INDEX IF NOT EXISTS idx_tour_packages_available ON tour_packages(available)');
 
     // Create indexes
     await pool.query('CREATE INDEX IF NOT EXISTS idx_tour_packages_slug ON tour_packages(slug)');

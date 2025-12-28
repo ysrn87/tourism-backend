@@ -124,6 +124,7 @@ app.get('/health', (req, res) => {
 
 /* ROUTES */
 app.use('/auth', authRoutes);
+app.use('/user/bookings', bookingRoutes);
 app.use('/user', userRoutes);
 app.use('/admin', adminRoutes);
 app.use('/tour-guide', tourGuideRoutes);
